@@ -9,8 +9,8 @@ class WalletRepository{
         });
     }
 
-    async findByUserId(userId){
-        return prisma.wallet.findUnique({
+    async findByUserId(userId,db=prisma){
+        return db.wallet.findUnique({
             where:{
                 userId
             }

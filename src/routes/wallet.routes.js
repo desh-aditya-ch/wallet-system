@@ -17,5 +17,10 @@ router.post("/deposit",
 router.post("/withdraw",
     authMiddleware,
     walletController.withdraw
-)
+);
+
+router.post("/transfer",
+    authMiddleware,
+    walletController.transfer
+);
 module.exports=router;

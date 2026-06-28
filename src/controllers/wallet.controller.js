@@ -62,6 +62,27 @@ class walletController{
             });
         }
     }
+
+    async transfer(req,res){
+        try{
+            const senderUserId=req.user.userId;
+            const{receiverEmail,amount}=req.body;
+            
+            const result=await walletService.transfer(senderUserId,receiverEmail,amount);
+
+            return res.status(200).json({
+                success:true,
+                data:result,
+            })
+        }
+        catch(error){
+            return res.status(400).json({
+                success:false,
+                message:error.message,
+            })
+        }
+        
+    }
 }
 
 module.exports = new walletController();

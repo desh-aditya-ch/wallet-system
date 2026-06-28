@@ -1,8 +1,8 @@
 const prisma=require("../config/prisma");
 
 class walletEventRepository{
-    async findByWalletId(walletId){
-        return prisma.walletEvent.findMany({
+    async findByWalletId(walletId,db=prisma){
+        return db.walletEvent.findMany({
             where:{
                 walletId
             },
@@ -11,8 +11,8 @@ class walletEventRepository{
             }
         });
     }
-    async create(data){
-        return prisma.walletEvent.create({
+    async create(data,db=prisma){
+        return db.walletEvent.create({
             data,
         });
     }
