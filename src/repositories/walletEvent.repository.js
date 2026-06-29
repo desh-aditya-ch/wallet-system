@@ -16,6 +16,19 @@ class walletEventRepository{
             data,
         });
     }
+
+    async getWalletHistory(walletId,tx=prisma){
+        return tx.walletEvent.findMany({
+            where:{
+                walletId
+                :walletId,
+        },
+        orderBy:{
+            createdAt:"desc",
+        },
+        
+        });
+    }
 }
 
 module.exports=new walletEventRepository();

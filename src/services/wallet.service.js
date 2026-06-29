@@ -131,6 +131,25 @@ class WalletService{
 
         });
     }
+    async getWalletHistory(userId){
+        const wallet= await walletRepository.findByUserId(userId);
+
+        if(!wallet){
+            throw new Error("Wallet Not Found");
+        }
+
+        const history= await walletEventRepository.getWalletHistory(wallet.id);
+
+        return history;
+    }
+
+
+
+
+
+
+
+
     calculateBalance(events) {
 
         let balance = 0;

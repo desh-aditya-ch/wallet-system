@@ -23,4 +23,9 @@ router.post("/transfer",
     authMiddleware,
     walletController.transfer
 );
+
+router.post("/history",
+    authMiddleware,
+    walletController.getWalletHistory
+)
 module.exports=router;
