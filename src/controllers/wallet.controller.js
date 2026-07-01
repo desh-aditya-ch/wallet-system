@@ -102,6 +102,25 @@ class walletController{
             });
         }
     }
+    async getHistorcialBalance(req,res){
+        try{
+            const {userId}=req.user;
+            const {at}=req.query;
+
+            const balance=await walletService.getHistoricalBalance(userId,at);
+
+            return res.status(200).json({
+                success:true,
+                balance:balance,
+            });
+        }
+        catch(error){
+            return res.status(400).json({
+                success:false,
+                error:error.message,
+            })
+        }
+    }
 }
 
 module.exports = new walletController();

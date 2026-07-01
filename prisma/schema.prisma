@@ -7,44 +7,43 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-model User{
-  id    String @id @default(uuid())
-  name  String
-  email String @unique
-  password String
-
-
-  wallet Wallet?
-
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  wallet    Wallet?
 }
 
 model Wallet {
-  id        String   @id @default(uuid())
-
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id])
-
+  id        String           @id @default(uuid())
+  userId    String           @unique
+  createdAt DateTime         @default(now())
+  user      User             @relation(fields: [userId], references: [id])
   events    WalletEvent[]
-
-  createdAt DateTime @default(now())
+  snapshots WalletSnapshot[]
 }
-
 
 model WalletEvent {
   id        String   @id @default(uuid())
-
   walletId  String
-  wallet    Wallet   @relation(fields: [walletId], references: [id])
-
   type      String
-
   amount    Decimal  @db.Decimal(18, 2)
-
   createdAt DateTime @default(now())
+  wallet    Wallet   @relation(fields: [walletId], references: [id])
 
   @@index([walletId])
   @@index([createdAt])
+}
+
+model WalletSnapshot {
+  id        String   @id @default(uuid())
+  walletId  String
+  balance   Int
+  createdAt DateTime @default(now())
+  wallet    Wallet   @relation(fields: [walletId], references: [id])
+
+  @@index([walletId])
 }

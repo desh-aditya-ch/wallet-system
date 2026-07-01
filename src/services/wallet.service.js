@@ -2,6 +2,8 @@ const walletRepository=require("../repositories/wallet.repository");
 const walletEventRepository=require("../repositories/walletEvent.repository");
 const prisma=require("../config/prisma");
 const userRepository = require("../repositories/user.repository");
+const walletsnapshotRepository = require("../repositories/walletsnapshot.repository");
+const { eventNames } = require("../app");
 
 class WalletService{
     async getBalance(userId){
@@ -11,14 +13,26 @@ class WalletService{
             throw new Error("Wallet Not Found");
         }
 
-        const events=await walletEventRepository.findByWalletId(wallet.id);
+        const snapshot=await walletsnapshotRepository.findLatestByWallet(wallet.id);
 
-        const balance = this.calculateBalance(events);
+        let balance=0;
+        let events=[];
 
-        return {
-            walletId: wallet.id,
-            balance
-        };
+        if(snapshot){
+            balance=snapshot.balance;
+
+            events=await walletEventRepository.findEventsAfterSnapshot(
+                wallet.id,
+                snapshot.createdAt
+            );
+        }
+        else{
+            events=await walletEventRepository.findByWalletId(wallet.id);
+        }
+
+        balance+= this.calculateBalance(events);
+
+        return balance;
     }
     async deposit(userId,amount){
         const wallet=await walletRepository.findByUserId(userId);
@@ -36,6 +50,8 @@ class WalletService{
             type:"CREDIT",
             amount
         });
+
+        await this.createSnapshotIfRequired(wallet.id);
 
         return{
             message:"Amount deposited Succesfully",
@@ -67,70 +83,88 @@ class WalletService{
             amount:amount,
         });
 
+        await this.createSnapshotIfRequired(wallet.id);
+
         return {
             message:"Amount withdrawn Successfully",
             event
         };
     }
-    async transfer(senderUserId,receiverEmail,amount){
-        return prisma.$transaction(async(tx)=>{
-            const senderWallet=await walletRepository.findByUserId(senderUserId,tx);
+async transfer(senderUserId, receiverEmail, amount) {
 
-            if(!senderWallet){
-                throw new Error("Sender Wallet not found")
-            }
+    const result = await prisma.$transaction(async (tx) => {
 
-            const receiverUser=await userRepository.findByEmail(receiverEmail,tx);
+        const senderWallet =
+            await walletRepository.findByUserId(senderUserId, tx);
 
-            if(!receiverUser){
-                throw new Error("Receiver Not Found");
-            }
+        if (!senderWallet) {
+            throw new Error("Sender Wallet not found");
+        }
 
-            if(receiverUser.id===senderUserId){
-                throw new Error("Cannot transfer to your own wallet");
-            }
+        const receiverUser =
+            await userRepository.findByEmail(receiverEmail, tx);
 
-            const receiverWallet=await walletRepository.findByUserId(receiverUser.id,tx);
-            
-            if(!receiverWallet){
-                throw new Error("Receiver wallet not found");
-            }
+        if (!receiverUser) {
+            throw new Error("Receiver Not Found");
+        }
 
-            if(amount<=0){
-                throw new Error("Amount must be positive");
-            }
+        if (receiverUser.id === senderUserId) {
+            throw new Error("Cannot transfer to your own wallet");
+        }
 
-            const senderEvents=await walletEventRepository.findByWalletId(senderWallet.id,tx);
+        const receiverWallet =
+            await walletRepository.findByUserId(receiverUser.id, tx);
 
-            const balance=this.calculateBalance(senderEvents);
+        if (!receiverWallet) {
+            throw new Error("Receiver wallet not found");
+        }
 
-            if(balance<amount){
-                throw new Error("Insufficient funds");
-            }
+        if (amount <= 0) {
+            throw new Error("Amount must be positive");
+        }
 
-            await walletEventRepository.create({
-                walletId:senderWallet.id,
-                type:"DEBIT",
+        const senderEvents =
+            await walletEventRepository.findByWalletId(senderWallet.id, tx);
+
+        const balance = this.calculateBalance(senderEvents);
+
+        if (balance < amount) {
+            throw new Error("Insufficient funds");
+        }
+
+        await walletEventRepository.create(
+            {
+                walletId: senderWallet.id,
+                type: "DEBIT",
                 amount,
             },
             tx
         );
 
-            await walletEventRepository.create({
-                walletId:receiverWallet.id,
-                type:"CREDIT",
+        await walletEventRepository.create(
+            {
+                walletId: receiverWallet.id,
+                type: "CREDIT",
                 amount,
             },
             tx
         );
 
         return {
-            message:"Transfer Completed Successfully",
+            senderWalletId: senderWallet.id,
+            receiverWalletId: receiverWallet.id,
+            message: "Transfer Completed Successfully",
         };
 
+    });
 
-        });
-    }
+    await this.createSnapshotIfRequired(result.senderWalletId);
+    await this.createSnapshotIfRequired(result.receiverWalletId);
+
+    return {
+        message: result.message,
+    };
+}
     async getWalletHistory(userId){
         const wallet= await walletRepository.findByUserId(userId);
 
@@ -142,12 +176,36 @@ class WalletService{
 
         return history;
     }
+    async getHistoricalBalance(userId,at){
+        if(!at){
+            throw new Error("at parameter is required");
+        }
 
+        const requestedTime=new Date(at);
 
+        if(isNaN(requestedTime.getTime())){
+            throw new Error("Invalid Date Format");
+        }
+        if(requestedTime>new Date()){
+            throw new Error("Cannot query future balance");
+        }
 
+        const wallet=await walletRepository.findByUserId(userId);
 
+        if(!wallet){
+            throw new Error("Wallet Not Found");
+        }
 
+        const events=await walletEventRepository.findByWalletIdBeforeTime(
+            wallet.id,
+            requestedTime
+        );
+        console.log(events);
+        
+        const balance=this.calculateBalance(events);
 
+        return balance;
+    }
 
 
     calculateBalance(events) {
@@ -169,6 +227,18 @@ class WalletService{
         }
 
         return balance;
+    }
+    async createSnapshotIfRequired(walletId){
+        const events=await walletEventRepository.findByWalletId(walletId);
+
+        if(events.length%100!==0){
+            return;
+        }
+        const balance=this.calculateBalance(events);
+        await walletsnapshotRepository.create({
+            walletId,
+            balance,
+        });
     }
 }
 

@@ -27,5 +27,11 @@ router.post("/transfer",
 router.post("/history",
     authMiddleware,
     walletController.getWalletHistory
-)
+);
+
+router.get("/balance/history",
+    authMiddleware,
+    walletController.getHistorcialBalance
+);
+
 module.exports=router;

@@ -29,6 +29,34 @@ class walletEventRepository{
         
         });
     }
+
+    async findByWalletIdBeforeTime(walletId,requestedTime,db=prisma){
+        return db.walletEvent.findMany({
+            where:{
+                walletId,
+                createdAt:{
+                    lte:requestedTime,
+                },
+            },
+            orderBy:{
+                createdAt:"asc",
+            },
+        });
+    }
+
+    async findEventsAfterSnapshot(walletId, snapshotTime, db = prisma) {
+    return await db.walletEvent.findMany({
+        where: {
+            walletId,
+            createdAt: {
+                gt: snapshotTime,
+            },
+        },
+        orderBy: {
+            createdAt: "asc",
+        },
+    });
+}
 }
 
 module.exports=new walletEventRepository();
