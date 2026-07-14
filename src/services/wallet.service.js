@@ -228,7 +228,7 @@ async transfer(senderUserId, receiverEmail, amount) {
     async shouldCreateSnapshot(walletId){
         const events=await walletEventRepository.findByWalletId(walletId);
 
-        return events.length%10===0;
+        return events.length%100===0;
     }
 
     async queueSnapshotIfRequired(walletId) {
