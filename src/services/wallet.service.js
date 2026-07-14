@@ -3,8 +3,7 @@ const walletEventRepository=require("../repositories/walletEvent.repository");
 const prisma=require("../config/prisma");
 const userRepository = require("../repositories/user.repository");
 const walletsnapshotRepository = require("../repositories/walletsnapshot.repository");
-const { eventNames } = require("../app");
-
+const snapshotQueue = require("../queues/snapshot.queue");
 class WalletService{
     async getBalance(userId){
         const wallet=await walletRepository.findByUserId(userId);
@@ -50,8 +49,7 @@ class WalletService{
             type:"CREDIT",
             amount
         });
-
-        await this.createSnapshotIfRequired(wallet.id);
+        await this.queueSnapshotIfRequired(wallet.id);
 
         return{
             message:"Amount deposited Succesfully",
@@ -83,7 +81,7 @@ class WalletService{
             amount:amount,
         });
 
-        await this.createSnapshotIfRequired(wallet.id);
+        await this.queueSnapshotIfRequired(wallet.id);
 
         return {
             message:"Amount withdrawn Successfully",
@@ -158,8 +156,8 @@ async transfer(senderUserId, receiverEmail, amount) {
 
     });
 
-    await this.createSnapshotIfRequired(result.senderWalletId);
-    await this.createSnapshotIfRequired(result.receiverWalletId);
+    await this.queueSnapshotIfRequired(result.senderWalletId);
+    await this.queueSnapshotIfRequired(result.receiverWalletId);
 
     return {
         message: result.message,
@@ -200,7 +198,6 @@ async transfer(senderUserId, receiverEmail, amount) {
             wallet.id,
             requestedTime
         );
-        console.log(events);
         
         const balance=this.calculateBalance(events);
 
@@ -228,13 +225,30 @@ async transfer(senderUserId, receiverEmail, amount) {
 
         return balance;
     }
-    async createSnapshotIfRequired(walletId){
+    async shouldCreateSnapshot(walletId){
         const events=await walletEventRepository.findByWalletId(walletId);
 
-        if(events.length%100!==0){
-            return;
-        }
+        return events.length%10===0;
+    }
+
+    async queueSnapshotIfRequired(walletId) {
+    const shouldCreate = await this.shouldCreateSnapshot(walletId);
+
+    if (!shouldCreate) {
+        return;
+    }
+
+    await snapshotQueue.addSnapshotJob({
+        walletId,
+    });
+}
+
+
+    async createSnapshot(walletId){
+        const events=await walletEventRepository.findByWalletId(walletId);
+
         const balance=this.calculateBalance(events);
+
         await walletsnapshotRepository.create({
             walletId,
             balance,
