@@ -39,11 +39,13 @@ model WalletEvent {
 }
 
 model WalletSnapshot {
-  id        String   @id @default(uuid())
-  walletId  String
-  balance   Int
-  createdAt DateTime @default(now())
-  wallet    Wallet   @relation(fields: [walletId], references: [id])
+  id          String   @id @default(uuid())
+  walletId    String
+  balance     Decimal  @db.Decimal(18,2)
 
-  @@index([walletId])
+  lastEventId Int
+
+  wallet      Wallet   @relation(fields: [walletId], references: [id])
+
+  createdAt   DateTime @default(now())
 }

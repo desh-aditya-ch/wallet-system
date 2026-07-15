@@ -57,6 +57,29 @@ class walletEventRepository{
         },
     });
 }
+
+    async countByWalletId(walletId){
+        return await prisma.walletEvent.count({
+            where:{
+                walletId,
+            }
+        })
+    }
+
+    async findEventsAfter(walletId,lastEventId){
+        return await prisma.walletEvent.findMany({
+            where:{
+                walletId,
+                id:{
+                    gt:lastEventId,
+                },
+            },
+            orderBy:{
+                id:"asc",
+            },
+        });
+    }
+
 }
 
 module.exports=new walletEventRepository();

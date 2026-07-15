@@ -205,30 +205,30 @@ async transfer(senderUserId, receiverEmail, amount) {
     }
 
 
-    calculateBalance(events) {
+    calculateBalance(events, startingBalance = 0) {
 
-        let balance = 0;
+    let balance = startingBalance;
 
-        for (const event of events) {
+    for (const event of events) {
 
-            const amount = Number(event.amount);
+        const amount = Number(event.amount);
 
-            if (event.type === "CREDIT") {
-                balance += amount;
-            }
-
-            if (event.type === "DEBIT") {
-                balance -= amount;
-            }
-
+        if (event.type === "CREDIT") {
+            balance += amount;
         }
 
-        return balance;
-    }
-    async shouldCreateSnapshot(walletId){
-        const events=await walletEventRepository.findByWalletId(walletId);
+        if (event.type === "DEBIT") {
+            balance -= amount;
+        }
 
-        return events.length%100===0;
+    }
+
+    return balance;
+}
+    async shouldCreateSnapshot(walletId){
+        const eventCount=await walletEventRepository.countByWalletId(walletId);
+
+        return eventCount%100===0;
     }
 
     async queueSnapshotIfRequired(walletId) {
@@ -245,14 +245,22 @@ async transfer(senderUserId, receiverEmail, amount) {
 
 
     async createSnapshot(walletId){
-        const events=await walletEventRepository.findByWalletId(walletId);
+        const latestSnapshot=await walletsnapshotRepository.findLatestByWallet(walletId);
 
-        const balance=this.calculateBalance(events);
+        const lastEventId=
+            latestSnapshot?.lastEventId ??0;
 
-        await walletsnapshotRepository.create({
-            walletId,
-            balance,
-        });
+        const events=
+            await walletEventRepository.findEventsAfter(walletId,lastEventId);
+
+        const startingBalance =
+            Number(latestSnapshot?.balance ?? 0);
+
+        const balance =
+            this.calculateBalance(
+                events,
+                startingBalance
+            );
     }
 }
 
