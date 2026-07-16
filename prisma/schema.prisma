@@ -28,24 +28,37 @@ model Wallet {
 
 model WalletEvent {
   id        String   @id @default(uuid())
+
   walletId  String
+
+  version   Int
+
   type      String
-  amount    Decimal  @db.Decimal(18, 2)
+
+  amount    Decimal @db.Decimal(18,2)
+
   createdAt DateTime @default(now())
-  wallet    Wallet   @relation(fields: [walletId], references: [id])
+
+  wallet Wallet @relation(fields:[walletId], references:[id])
 
   @@index([walletId])
   @@index([createdAt])
+
+  @@unique([walletId, version])
 }
 
 model WalletSnapshot {
+
   id          String   @id @default(uuid())
+
   walletId    String
+
   balance     Decimal  @db.Decimal(18,2)
 
-  lastEventId Int
+  lastVersion Int
 
-  wallet      Wallet   @relation(fields: [walletId], references: [id])
+  wallet      Wallet @relation(fields: [walletId], references: [id])
 
   createdAt   DateTime @default(now())
+
 }

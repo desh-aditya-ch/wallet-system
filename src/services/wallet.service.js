@@ -1,6 +1,7 @@
 const walletRepository=require("../repositories/wallet.repository");
 const walletEventRepository=require("../repositories/walletEvent.repository");
 const prisma=require("../config/prisma");
+const { Prisma } = require("@prisma/client");
 const userRepository = require("../repositories/user.repository");
 const walletsnapshotRepository = require("../repositories/walletsnapshot.repository");
 const snapshotQueue = require("../queues/snapshot.queue");
@@ -41,13 +42,12 @@ class WalletService{
         }
 
         if(amount<=0){
-            throw new Error("Amoynt must be greater than Zero");
+            throw new Error("Amount must be greater than Zero");
         }
-
-        const event=await walletEventRepository.create({
-            walletId:wallet.id,
-            type:"CREDIT",
-            amount
+        const event = await this.appendWalletEvent({
+            walletId: wallet.id,
+            type: "CREDIT",
+            amount,
         });
         await this.queueSnapshotIfRequired(wallet.id);
 
@@ -75,10 +75,10 @@ class WalletService{
             throw new Error("Insufficient funds");
         }
 
-        const event=await walletEventRepository.create({
-            walletId:wallet.id,
-            type:"DEBIT",
-            amount:amount,
+        const event = await this.appendWalletEvent({
+            walletId: wallet.id,
+            type: "DEBIT",
+            amount,
         });
 
         await this.queueSnapshotIfRequired(wallet.id);
@@ -130,23 +130,23 @@ async transfer(senderUserId, receiverEmail, amount) {
             throw new Error("Insufficient funds");
         }
 
-        await walletEventRepository.create(
-            {
-                walletId: senderWallet.id,
-                type: "DEBIT",
-                amount,
-            },
-            tx
-        );
+        await this.appendWalletEvent(
+        {
+            walletId: senderWallet.id,
+            type: "DEBIT",
+            amount,
+        },
+        tx
+    );
 
-        await walletEventRepository.create(
-            {
-                walletId: receiverWallet.id,
-                type: "CREDIT",
-                amount,
-            },
-            tx
-        );
+    await this.appendWalletEvent(
+        {
+            walletId: receiverWallet.id,
+            type: "CREDIT",
+            amount,
+        },
+        tx
+    );
 
         return {
             senderWalletId: senderWallet.id,
@@ -261,6 +261,39 @@ async transfer(senderUserId, receiverEmail, amount) {
                 events,
                 startingBalance
             );
+    }
+
+    async getNextVersion(walletId){
+        const latestVersion=
+            await walletEventRepository.findLatestVersion(walletId);
+
+        return latestVersion+1;
+    }
+    async appendWalletEvent(eventData,tx=prisma){
+        const MAX_RETRIES=3;
+
+        for(let attempt=1;attempt<=MAX_RETRIES;attempt++){
+            try{
+                const version=await this.getNextVersion(eventData.walletId);
+
+                return await walletEventRepository.create(
+                    {
+                    ...eventData,
+                    version,
+                    },
+                    tx
+                );
+            }catch(error){
+                if(
+                    error instanceof Prisma.PrismaClientKnownRequestError&&
+                    error.code==="P2002" &&
+                    attempt<MAX_RETRIES
+                ){
+                    continue;
+                }
+                throw error;
+            }
+        }
     }
 }
 

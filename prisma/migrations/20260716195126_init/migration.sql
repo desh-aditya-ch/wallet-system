@@ -23,11 +23,23 @@ CREATE TABLE "Wallet" (
 CREATE TABLE "WalletEvent" (
     "id" TEXT NOT NULL,
     "walletId" TEXT NOT NULL,
+    "version" INTEGER NOT NULL,
     "type" TEXT NOT NULL,
     "amount" DECIMAL(18,2) NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "WalletEvent_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "WalletSnapshot" (
+    "id" TEXT NOT NULL,
+    "walletId" TEXT NOT NULL,
+    "balance" DECIMAL(18,2) NOT NULL,
+    "lastVersion" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "WalletSnapshot_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -42,8 +54,14 @@ CREATE INDEX "WalletEvent_walletId_idx" ON "WalletEvent"("walletId");
 -- CreateIndex
 CREATE INDEX "WalletEvent_createdAt_idx" ON "WalletEvent"("createdAt");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "WalletEvent_walletId_version_key" ON "WalletEvent"("walletId", "version");
+
 -- AddForeignKey
 ALTER TABLE "Wallet" ADD CONSTRAINT "Wallet_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "WalletEvent" ADD CONSTRAINT "WalletEvent_walletId_fkey" FOREIGN KEY ("walletId") REFERENCES "Wallet"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "WalletSnapshot" ADD CONSTRAINT "WalletSnapshot_walletId_fkey" FOREIGN KEY ("walletId") REFERENCES "Wallet"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

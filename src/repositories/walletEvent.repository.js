@@ -7,7 +7,7 @@ class walletEventRepository{
                 walletId
             },
             orderBy:{
-            createdAt:"asc"
+            version:"asc"
             }
         });
     }
@@ -66,18 +66,36 @@ class walletEventRepository{
         })
     }
 
-    async findEventsAfter(walletId,lastEventId){
-        return await prisma.walletEvent.findMany({
-            where:{
-                walletId,
-                id:{
-                    gt:lastEventId,
-                },
+    async findEventsAfter(walletId, lastVersion, db = prisma) {
+
+    return db.walletEvent.findMany({
+        where: {
+            walletId,
+            version: {
+                gt: lastVersion,
             },
-            orderBy:{
-                id:"asc",
+        },
+        orderBy: {
+            version: "asc",
+        },
+    });
+
+}
+    
+    async findLatestVersion(walletId) {
+        const latestEvent = await prisma.walletEvent.findFirst({
+            where: {
+                walletId,
+            },
+            orderBy: {
+                version: "desc",
+            },
+            select: {
+                version: true,
             },
         });
+
+        return latestEvent?.version ?? 0;
     }
 
 }
